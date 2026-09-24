@@ -1,7 +1,4 @@
-enum UserRole {
-  admin,
-  secretary,
-}
+enum UserRole { admin, secretary }
 
 enum AppPermission {
   receiveDeliveries,
@@ -22,6 +19,9 @@ class AppUser {
     required this.displayName,
     required this.role,
     required this.isActive,
+    this.companyId,
+    this.companyName,
+    this.companyLogoPath,
   });
 
   final String id;
@@ -29,6 +29,31 @@ class AppUser {
   final String displayName;
   final UserRole role;
   final bool isActive;
+  final String? companyId;
+  final String? companyName;
+  final String? companyLogoPath;
+
+  AppUser copyWith({
+    String? username,
+    String? displayName,
+    UserRole? role,
+    bool? isActive,
+    String? companyId,
+    String? companyName,
+    String? companyLogoPath,
+    bool clearCompanyLogoPath = false,
+  }) => AppUser(
+    id: id,
+    username: username ?? this.username,
+    displayName: displayName ?? this.displayName,
+    role: role ?? this.role,
+    isActive: isActive ?? this.isActive,
+    companyId: companyId ?? this.companyId,
+    companyName: companyName ?? this.companyName,
+    companyLogoPath: clearCompanyLogoPath
+        ? null
+        : companyLogoPath ?? this.companyLogoPath,
+  );
 
   bool can(AppPermission permission) {
     if (role == UserRole.admin) return true;
@@ -44,4 +69,18 @@ class AppUser {
       AppPermission.unrestrictedDeletion => false,
     };
   }
+}
+
+class CompanyMembership {
+  const CompanyMembership({
+    required this.companyId,
+    required this.companyName,
+    required this.role,
+    this.logoPath,
+  });
+
+  final String companyId;
+  final String companyName;
+  final UserRole role;
+  final String? logoPath;
 }

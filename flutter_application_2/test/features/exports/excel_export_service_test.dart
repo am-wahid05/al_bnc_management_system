@@ -75,7 +75,7 @@ void main() {
 
     final file = await service.exportDaily(DateTime(2026, 9, 20));
 
-    expect(file.path, endsWith('ALBNC_Daily_Report_2026-09-20.xlsx'));
+    expect(file.path, endsWith('Company_Daily_Report_2026-09-20.xlsx'));
     expect(await file.exists(), isTrue);
     final bytes = await file.readAsBytes();
     expect(bytes.length, greaterThan(100));

@@ -2,14 +2,17 @@ class Product {
   Product({
     required this.id,
     required this.name,
+    this.companyId,
     this.isActive = true,
     DateTime? createdAt,
     DateTime? updatedAt,
-  })  : createdAt = createdAt ?? DateTime.fromMillisecondsSinceEpoch(0),
-        updatedAt = updatedAt ?? createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+  }) : createdAt = createdAt ?? DateTime.fromMillisecondsSinceEpoch(0),
+       updatedAt =
+           updatedAt ?? createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
 
   final String id;
   final String name;
+  final String? companyId;
   final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -24,6 +27,7 @@ class Product {
     return Product(
       id: id,
       name: name ?? this.name,
+      companyId: companyId,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

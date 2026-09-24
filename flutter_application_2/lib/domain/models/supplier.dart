@@ -1,7 +1,4 @@
-enum SupplierType {
-  farmer,
-  aggregator,
-}
+enum SupplierType { farmer, aggregator }
 
 class Supplier {
   Supplier({
@@ -11,15 +8,17 @@ class Supplier {
     required this.town,
     required this.district,
     required this.region,
+    this.companyId,
     this.phone,
     this.notes,
     DateTime? createdAt,
     DateTime? updatedAt,
     this.isActive = true,
     String? internalId,
-  })  : internalId = internalId ?? id,
-        createdAt = createdAt ?? DateTime.fromMillisecondsSinceEpoch(0),
-        updatedAt = updatedAt ?? createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+  }) : internalId = internalId ?? id,
+       createdAt = createdAt ?? DateTime.fromMillisecondsSinceEpoch(0),
+       updatedAt =
+           updatedAt ?? createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
 
   final String internalId;
   final String id;
@@ -28,6 +27,7 @@ class Supplier {
   final String town;
   final String district;
   final String region;
+  final String? companyId;
   final String? phone;
   final String? notes;
   final DateTime createdAt;
@@ -54,6 +54,7 @@ class Supplier {
       town: town ?? this.town,
       district: district ?? this.district,
       region: region ?? this.region,
+      companyId: companyId,
       phone: phone ?? this.phone,
       notes: notes ?? this.notes,
       createdAt: createdAt,

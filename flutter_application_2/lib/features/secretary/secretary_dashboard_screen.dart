@@ -4,27 +4,70 @@ import '../../app/app_routes.dart';
 import '../sync/sync_coordinator.dart';
 import '../sync/sync_status_card.dart';
 import '../sync/sync_status_repository.dart';
+import '../auth/active_company_context.dart';
+import '../auth/auth_repository.dart';
+import '../company/company_branding.dart';
 
 class SecretaryDashboardScreen extends StatelessWidget {
-  const SecretaryDashboardScreen({required this.statusRepository, required this.onLogout, this.coordinator, super.key});
+  const SecretaryDashboardScreen({
+    required this.statusRepository,
+    required this.onLogout,
+    this.coordinator,
+    this.activeCompanyContext,
+    this.authRepository,
+    this.onCompanyChanging,
+    this.onCompanyChanged,
+    this.brandingService,
+    super.key,
+  });
 
   final SyncStatusRepository statusRepository;
   final VoidCallback onLogout;
   final SyncCoordinator? coordinator;
+  final ActiveCompanyContext? activeCompanyContext;
+  final AuthRepository? authRepository;
+  final VoidCallback? onCompanyChanging;
+  final Future<void> Function()? onCompanyChanged;
+  final CompanyBrandingService? brandingService;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Secretary Dashboard')),
+      appBar: AppBar(
+        title: activeCompanyContext == null
+            ? const Text('Secretary Dashboard')
+            : CompanyBrandMark(
+                context: activeCompanyContext!,
+                service: brandingService,
+                logoSize: 32,
+                nameStyle: Theme.of(context).textTheme.titleSmall,
+              ),
+        actions: activeCompanyContext == null || authRepository == null
+            ? null
+            : [
+                CompanySwitcher(
+                  authRepository: authRepository!,
+                  activeCompanyContext: activeCompanyContext!,
+                  onCompanyChanging: onCompanyChanging,
+                  onCompanyChanged: onCompanyChanged,
+                ),
+              ],
+      ),
       drawer: _SecretaryDrawer(onLogout: onLogout),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          Text('Receiving desk', style: Theme.of(context).textTheme.headlineMedium),
+          Text(
+            'Receiving desk',
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
           const SizedBox(height: 8),
           const Text('Quick access to today\'s receiving work.'),
           const SizedBox(height: 24),
-          SyncStatusCard(statusRepository: statusRepository, coordinator: coordinator),
+          SyncStatusCard(
+            statusRepository: statusRepository,
+            coordinator: coordinator,
+          ),
           const SizedBox(height: 24),
           _ActionTile(
             icon: Icons.add_box_outlined,
@@ -46,7 +89,12 @@ class SecretaryDashboardScreen extends StatelessWidget {
 }
 
 class _ActionTile extends StatelessWidget {
-  const _ActionTile({required this.icon, required this.title, required this.subtitle, required this.route});
+  const _ActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.route,
+  });
 
   final IconData icon;
   final String title;
@@ -58,7 +106,11 @@ class _ActionTile extends StatelessWidget {
     return Card(
       child: ListTile(
         contentPadding: const EdgeInsets.all(20),
-        leading: Icon(icon, size: 32, color: Theme.of(context).colorScheme.primary),
+        leading: Icon(
+          icon,
+          size: 32,
+          color: Theme.of(context).colorScheme.primary,
+        ),
         title: Text(title),
         subtitle: Text(subtitle),
         trailing: const Icon(Icons.chevron_right),

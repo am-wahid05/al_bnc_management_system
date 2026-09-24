@@ -30,9 +30,16 @@ class PlaceholderScreen extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(icon, size: 56, color: Theme.of(context).colorScheme.primary),
+                    Icon(
+                      icon,
+                      size: 56,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                     const SizedBox(height: 20),
-                    Text(title, style: Theme.of(context).textTheme.headlineSmall),
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
                     const SizedBox(height: 12),
                     Text(
                       subtitle,
@@ -60,25 +67,65 @@ class _AppNavigationDrawer extends StatelessWidget {
     return NavigationDrawer(
       header: const Padding(
         padding: EdgeInsets.fromLTRB(28, 24, 20, 16),
-        child: Text('AL-BNC Ventures'),
+        child: Text('Company Management'),
       ),
       children: [
-        _navigationDestination(context, 'Login', Icons.lock_outline, AppRoutes.login),
+        _navigationDestination(
+          context,
+          'Login',
+          Icons.lock_outline,
+          AppRoutes.login,
+        ),
         const Padding(
           padding: EdgeInsets.fromLTRB(28, 16, 16, 8),
           child: Text('Secretary'),
         ),
-        _navigationDestination(context, 'Secretary Dashboard', Icons.scale, AppRoutes.secretaryDashboard),
-        _navigationDestination(context, 'New Receiving', Icons.add_box_outlined, AppRoutes.newReceiving),
-        _navigationDestination(context, "Today's Records", Icons.today_outlined, AppRoutes.todaysRecords),
+        _navigationDestination(
+          context,
+          'Secretary Dashboard',
+          Icons.scale,
+          AppRoutes.secretaryDashboard,
+        ),
+        _navigationDestination(
+          context,
+          'New Receiving',
+          Icons.add_box_outlined,
+          AppRoutes.newReceiving,
+        ),
+        _navigationDestination(
+          context,
+          "Today's Records",
+          Icons.today_outlined,
+          AppRoutes.todaysRecords,
+        ),
         const Padding(
           padding: EdgeInsets.fromLTRB(28, 16, 16, 8),
           child: Text('Management'),
         ),
-        _navigationDestination(context, 'Admin Dashboard', Icons.dashboard_outlined, AppRoutes.adminDashboard),
-        _navigationDestination(context, 'Suppliers', Icons.people_outline, AppRoutes.suppliers),
-        _navigationDestination(context, 'Reports', Icons.assessment_outlined, AppRoutes.reports),
-        _navigationDestination(context, 'Settings', Icons.settings_outlined, AppRoutes.settings),
+        _navigationDestination(
+          context,
+          'Admin Dashboard',
+          Icons.dashboard_outlined,
+          AppRoutes.adminDashboard,
+        ),
+        _navigationDestination(
+          context,
+          'Suppliers',
+          Icons.people_outline,
+          AppRoutes.suppliers,
+        ),
+        _navigationDestination(
+          context,
+          'Reports',
+          Icons.assessment_outlined,
+          AppRoutes.reports,
+        ),
+        _navigationDestination(
+          context,
+          'Settings',
+          Icons.settings_outlined,
+          AppRoutes.settings,
+        ),
       ],
     );
   }

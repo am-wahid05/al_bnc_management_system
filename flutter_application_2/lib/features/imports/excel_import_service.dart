@@ -100,12 +100,14 @@ class ExcelImportService {
     required this.database,
     required this.deliveryRepository,
     required this.userId,
+    this.companyIdProvider,
     this.receivingService,
   });
 
   final Database database;
   final DeliveryRepository deliveryRepository;
   final String userId;
+  final String? Function()? companyIdProvider;
   final ReceivingService? receivingService;
 
   ImportWorkbook readWorkbook(Uint8List bytes, String filename) {
@@ -141,7 +143,11 @@ class ExcelImportService {
         final date = _date(
           _value(sheet, row, mapping.column(ImportField.date)),
         );
-        final supplierId = _value(sheet, row, mapping.column(ImportField.supplierId));
+        final supplierId = _value(
+          sheet,
+          row,
+          mapping.column(ImportField.supplierId),
+        );
         final supplierName = _required(
           _value(sheet, row, mapping.column(ImportField.supplierName)),
           'Supplier name',
@@ -176,11 +182,11 @@ class ExcelImportService {
           product: Product(id: productId, name: productName),
           recordedAt: date,
           bagWeights: weights,
-          recordedByUserId: _value(
-            sheet,
-            row,
-            mapping.column(ImportField.recordedBy),
-          ),
+          // A spreadsheet's recorder label is not a Supabase user identity.
+          // The authenticated importer is assigned by ReceivingService when
+          // it creates the new record; historical rows are never inferred.
+          recordedByUserId: null,
+          companyId: companyIdProvider?.call(),
         );
         results.add(ImportRowResult(rowNumber: index + 2, delivery: delivery));
       } on FormatException catch (error) {
@@ -232,6 +238,11 @@ class ExcelImportService {
     String filename,
     ImportValidation validation,
   ) async {
+    if (companyIdProvider != null && companyIdProvider!() == null) {
+      throw StateError(
+        'Select an active company before importing business data.',
+      );
+    }
     var imported = 0;
     var skipped = validation.warningCount;
     var failed = validation.failedCount;
@@ -275,6 +286,7 @@ class ExcelImportService {
       'filename': filename,
       'imported_at': DateTime.now().toIso8601String(),
       'imported_by_user_id': userId,
+      if (companyIdProvider != null) 'company_id': companyIdProvider!(),
       'rows_total': validation.rows.length,
       'rows_imported': imported,
       'rows_skipped': skipped,

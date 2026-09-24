@@ -25,7 +25,7 @@ void main() {
           await database.execute('''
         CREATE TABLE deliveries (
           id TEXT PRIMARY KEY, supplier_id TEXT NOT NULL, product_id TEXT NOT NULL,
-          recorded_at TEXT NOT NULL, recorded_by_user_id TEXT NOT NULL, status TEXT NOT NULL,
+          recorded_at TEXT NOT NULL, recorded_by_user_id TEXT, status TEXT NOT NULL,
           synchronization_status TEXT NOT NULL, supplier_name TEXT NOT NULL, product_name TEXT NOT NULL,
           supplier_type TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
         )
@@ -53,7 +53,9 @@ void main() {
           synchronization_status TEXT NOT NULL, synchronization_error TEXT
         )
       ''');
-          await database.execute('CREATE TABLE local_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+          await database.execute(
+            'CREATE TABLE local_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
+          );
         },
       ),
     );
@@ -153,28 +155,39 @@ void main() {
     expect(await database.query('suppliers'), hasLength(1));
   });
 
-  test('creates one supplier profile and reuses it for normalized names', () async {
-    final rows = [
-      _importRow('2026-09-20', 'Ibrahim Mensah', '80,70'),
-      _importRow('2026-09-21', '  ibrahim   mensah ', '75'),
-    ];
-    final validation = ImportValidation(
-      rows: rows
-          .asMap()
-          .entries
-          .map((entry) => ImportRowResult(rowNumber: entry.key + 2, delivery: entry.value))
-          .toList(),
-    );
+  test(
+    'creates one supplier profile and reuses it for normalized names',
+    () async {
+      final rows = [
+        _importRow('2026-09-20', 'Ibrahim Mensah', '80,70'),
+        _importRow('2026-09-21', '  ibrahim   mensah ', '75'),
+      ];
+      final validation = ImportValidation(
+        rows: rows
+            .asMap()
+            .entries
+            .map(
+              (entry) => ImportRowResult(
+                rowNumber: entry.key + 2,
+                delivery: entry.value,
+              ),
+            )
+            .toList(),
+      );
 
-    final summary = await service.importValid('suppliers.xlsx', validation);
+      final summary = await service.importValid('suppliers.xlsx', validation);
 
-    expect(summary.imported, 2);
-    final suppliers = await database.query('suppliers');
-    expect(suppliers, hasLength(1));
-    final deliveries = await database.query('deliveries', orderBy: 'recorded_at');
-    expect(deliveries, hasLength(2));
-    expect(deliveries[0]['supplier_id'], deliveries[1]['supplier_id']);
-  });
+      expect(summary.imported, 2);
+      final suppliers = await database.query('suppliers');
+      expect(suppliers, hasLength(1));
+      final deliveries = await database.query(
+        'deliveries',
+        orderBy: 'recorded_at',
+      );
+      expect(deliveries, hasLength(2));
+      expect(deliveries[0]['supplier_id'], deliveries[1]['supplier_id']);
+    },
+  );
 
   test('skips a likely duplicate without overwriting it', () async {
     final workbook = Excel.createExcel();
@@ -222,21 +235,22 @@ void main() {
   });
 }
 
-Delivery _importRow(String date, String supplierName, String weights) => Delivery(
-      id: 'historical-${DateTime.now().microsecondsSinceEpoch}-${supplierName.hashCode}',
-      supplier: Supplier(
-        id: '',
-        name: supplierName,
-        type: SupplierType.aggregator,
-        town: 'Techiman',
-        district: 'Techiman Municipal',
-        region: 'Bono East',
-      ),
-      product: Product(
-        id: 'cashew',
-        name: 'Cashew',
-      ),
-      recordedAt: DateTime.parse(date),
-      bagWeights: weights.split(',').map(double.parse).toList(),
-      recordedByUserId: 'legacy',
-    );
+Delivery _importRow(
+  String date,
+  String supplierName,
+  String weights,
+) => Delivery(
+  id: 'historical-${DateTime.now().microsecondsSinceEpoch}-${supplierName.hashCode}',
+  supplier: Supplier(
+    id: '',
+    name: supplierName,
+    type: SupplierType.aggregator,
+    town: 'Techiman',
+    district: 'Techiman Municipal',
+    region: 'Bono East',
+  ),
+  product: Product(id: 'cashew', name: 'Cashew'),
+  recordedAt: DateTime.parse(date),
+  bagWeights: weights.split(',').map(double.parse).toList(),
+  recordedByUserId: 'legacy',
+);

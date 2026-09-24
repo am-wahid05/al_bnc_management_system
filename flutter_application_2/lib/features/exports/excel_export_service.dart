@@ -12,14 +12,21 @@ class ExcelExportService implements SupplierStatementExporter {
   ExcelExportService(
     this.deliveryRepository, {
     Future<Directory> Function()? directoryProvider,
+    this.companyNameProvider,
+    this.recorderNamesProvider,
   }) : _directoryProvider = directoryProvider ?? _defaultDirectory;
 
   final DeliveryRepository deliveryRepository;
+  final String Function()? companyNameProvider;
+  final Future<Map<String, String>> Function()? recorderNamesProvider;
   final Future<Directory> Function() _directoryProvider;
+
+  String get _companyPrefix =>
+      _safeName(companyNameProvider?.call() ?? 'Company');
 
   Future<File> exportDaily(DateTime date) async {
     return _write(
-      'ALBNC_Daily_Report_${_datePart(date)}.xlsx',
+      '${_companyPrefix}_Daily_Report_${_datePart(date)}.xlsx',
       await deliveryRepository.forDate(date),
     );
   }
@@ -27,14 +34,14 @@ class ExcelExportService implements SupplierStatementExporter {
   Future<File> exportMonthly(int year, int month) async {
     final start = DateTime(year, month);
     return _write(
-      'ALBNC_Monthly_Report_${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}.xlsx',
+      '${_companyPrefix}_Monthly_Report_${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}.xlsx',
       await deliveryRepository.forRange(start, DateTime(year, month + 1)),
     );
   }
 
   Future<File> exportYearly(int year) async {
     return _write(
-      'ALBNC_Yearly_Report_$year.xlsx',
+      '${_companyPrefix}_Yearly_Report_$year.xlsx',
       await deliveryRepository.forRange(DateTime(year), DateTime(year + 1)),
     );
   }
@@ -44,7 +51,7 @@ class ExcelExportService implements SupplierStatementExporter {
     String supplierName,
   ) async {
     return _write(
-      'ALBNC_Supplier_${_safeName(supplierName)}.xlsx',
+      '${_companyPrefix}_Supplier_${_safeName(supplierName)}.xlsx',
       await deliveryRepository.forRange(
         DateTime(2000),
         DateTime(2100),
@@ -56,14 +63,14 @@ class ExcelExportService implements SupplierStatementExporter {
   @override
   Future<File> export(SupplierStatement statement) async {
     return _writeStatement(
-      'ALBNC_Statement_${_safeName(statement.supplier.name)}_${_datePart(statement.from)}_${_datePart(statement.to)}.xlsx',
+      '${_companyPrefix}_Statement_${_safeName(statement.supplier.name)}_${_datePart(statement.from)}_${_datePart(statement.to)}.xlsx',
       statement,
     );
   }
 
   Future<File> exportProductReport(String productId, String productName) async {
     return _write(
-      'ALBNC_Product_${_safeName(productName)}.xlsx',
+      '${_companyPrefix}_Product_${_safeName(productName)}.xlsx',
       await deliveryRepository.forRange(
         DateTime(2000),
         DateTime(2100),
@@ -79,12 +86,13 @@ class ExcelExportService implements SupplierStatementExporter {
       if (delivery != null) deliveries.add(delivery);
     }
     return _write(
-      'ALBNC_Selected_Deliveries_${_datePart(DateTime.now())}.xlsx',
+      '${_companyPrefix}_Selected_Deliveries_${_datePart(DateTime.now())}.xlsx',
       deliveries,
     );
   }
 
   Future<File> _write(String filename, List<Delivery> deliveries) async {
+    final recorderNames = await recorderNamesProvider?.call() ?? const {};
     final workbook = Excel.createExcel();
     final sheet = workbook['Receiving'];
     final maxBags = deliveries.fold<int>(
@@ -104,7 +112,10 @@ class ExcelExportService implements SupplierStatementExporter {
       'Number of Bags',
       'Total Weight',
       'Recorded By',
-      ...List.generate(maxBags, (index) => 'Bag ${index + 1} Weight'),
+      ...List.generate(
+        maxBags,
+        (index) => ['Bag ${index + 1} Weight', 'Bag ${index + 1} Recorded By'],
+      ).expand((values) => values),
     ];
     sheet.appendRow(headers.map(TextCellValue.new).toList());
     for (final delivery in deliveries) {
@@ -119,8 +130,24 @@ class ExcelExportService implements SupplierStatementExporter {
         TextCellValue(delivery.product.name),
         IntCellValue(delivery.numberOfBags),
         DoubleCellValue(delivery.totalWeight),
-        TextCellValue(delivery.recordedByUserId),
-        ...delivery.bagWeights.map(DoubleCellValue.new),
+        TextCellValue(
+          recorderDisplayName(delivery.recordedByUserId, recorderNames),
+        ),
+        for (var index = 0; index < maxBags; index++) ...[
+          if (index < delivery.bagWeights.length)
+            DoubleCellValue(delivery.bagWeights[index])
+          else
+            TextCellValue(''),
+          if (index < delivery.bagWeights.length)
+            TextCellValue(
+              recorderDisplayName(
+                delivery.recorderForBag(index),
+                recorderNames,
+              ),
+            )
+          else
+            TextCellValue(''),
+        ],
       ]);
     }
     final bytes = workbook.encode();
@@ -140,17 +167,28 @@ class ExcelExportService implements SupplierStatementExporter {
     String filename,
     SupplierStatement statement,
   ) async {
+    final recorderNames = await recorderNamesProvider?.call() ?? const {};
     final workbook = Excel.createExcel();
     final sheet = workbook['Statement'];
-    sheet.appendRow([TextCellValue('Supplier'), TextCellValue(statement.supplier.name)]);
-    sheet.appendRow([TextCellValue('From'), TextCellValue(_datePart(statement.from))]);
-    sheet.appendRow([TextCellValue('To'), TextCellValue(_datePart(statement.to))]);
+    sheet.appendRow([
+      TextCellValue('Supplier'),
+      TextCellValue(statement.supplier.name),
+    ]);
+    sheet.appendRow([
+      TextCellValue('From'),
+      TextCellValue(_datePart(statement.from)),
+    ]);
+    sheet.appendRow([
+      TextCellValue('To'),
+      TextCellValue(_datePart(statement.to)),
+    ]);
     sheet.appendRow(const []);
     sheet.appendRow([
       TextCellValue('Date'),
       TextCellValue('Product'),
       TextCellValue('Number of Bags'),
       TextCellValue('Total Weight'),
+      TextCellValue('Recorded By'),
     ]);
     for (final delivery in statement.deliveries) {
       sheet.appendRow([
@@ -158,10 +196,16 @@ class ExcelExportService implements SupplierStatementExporter {
         TextCellValue(delivery.product.name),
         IntCellValue(delivery.numberOfBags),
         DoubleCellValue(delivery.totalWeight),
+        TextCellValue(
+          recorderDisplayName(delivery.recordedByUserId, recorderNames),
+        ),
       ]);
     }
     sheet.appendRow(const []);
-    sheet.appendRow([TextCellValue('TOTAL BAGS'), IntCellValue(statement.totalBags)]);
+    sheet.appendRow([
+      TextCellValue('TOTAL BAGS'),
+      IntCellValue(statement.totalBags),
+    ]);
     sheet.appendRow([
       TextCellValue('TOTAL WEIGHT'),
       DoubleCellValue(statement.totalWeight),

@@ -15,26 +15,62 @@ class SmsReceiptException implements Exception {
 }
 
 class SmsReceiptService {
-  SmsReceiptService({http.Client? client, String? gatewayUrl, this._database})
-      : _client = client ?? http.Client(),
-        _gatewayUrl = gatewayUrl ?? const String.fromEnvironment('SMS_GATEWAY_URL');
+  SmsReceiptService({
+    http.Client? client,
+    String? gatewayUrl,
+    this._database,
+    this.companyIdProvider,
+  }) : _client = client ?? http.Client(),
+       _gatewayUrl =
+           gatewayUrl ?? const String.fromEnvironment('SMS_GATEWAY_URL');
 
   final http.Client _client;
   final String _gatewayUrl;
   final Database? _database;
+  final String? Function()? companyIdProvider;
 
-  Future<void> send(Delivery delivery) async {
+  Future<void> send(
+    Delivery delivery, {
+    String companyName = 'Company',
+    Map<String, String> recorderNames = const {},
+  }) async {
+    if (companyIdProvider != null) {
+      final companyId = companyIdProvider!();
+      if (companyId == null || delivery.companyId != companyId) {
+        throw const SmsReceiptException(
+          'The delivery must belong to the active company before sending a receipt.',
+        );
+      }
+    }
     final phone = GhanaPhoneNumber.normalize(delivery.supplier.phone);
     if (phone == null) {
-      throw const SmsReceiptException('A valid Ghana phone number is required before sending a receipt.');
+      throw const SmsReceiptException(
+        'A valid Ghana phone number is required before sending a receipt.',
+      );
     }
     final database = _database;
     if (database != null) {
-      final previous = await database.query('receipt_sends', where: 'delivery_id = ? AND channel = ? AND status = ?', whereArgs: [delivery.id, 'sms', 'sent'], limit: 1);
-      if (previous.isNotEmpty) throw const SmsReceiptException('This receipt was already sent by SMS.');
+      final previous = await database.query(
+        'receipt_sends',
+        where:
+            'delivery_id = ? AND channel = ? AND status = ?${companyIdProvider == null ? '' : ' AND company_id IS ?'}',
+        whereArgs: [
+          delivery.id,
+          'sms',
+          'sent',
+          if (companyIdProvider != null) companyIdProvider!(),
+        ],
+        limit: 1,
+      );
+      if (previous.isNotEmpty)
+        throw const SmsReceiptException(
+          'This receipt was already sent by SMS.',
+        );
     }
     if (_gatewayUrl.trim().isEmpty) {
-      throw const SmsReceiptException('SMS sending is not configured. Set SMS_GATEWAY_URL to your secure backend endpoint.');
+      throw const SmsReceiptException(
+        'SMS sending is not configured. Set SMS_GATEWAY_URL to your secure backend endpoint.',
+      );
     }
 
     late http.Response response;
@@ -45,30 +81,39 @@ class SmsReceiptService {
             headers: const {'content-type': 'application/json'},
             body: jsonEncode({
               'to': phone,
-              'message': _message(delivery),
+              'message': _message(delivery, companyName, recorderNames),
               'reference': delivery.id,
             }),
           )
           .timeout(const Duration(seconds: 15));
     } catch (_) {
-      throw const SmsReceiptException('The SMS service could not be reached. Check the connection and try again.');
+      throw const SmsReceiptException(
+        'The SMS service could not be reached. Check the connection and try again.',
+      );
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw SmsReceiptException('The SMS service rejected the receipt (${response.statusCode}).');
+      throw SmsReceiptException(
+        'The SMS service rejected the receipt (${response.statusCode}).',
+      );
     }
     late Object? decoded;
     try {
       decoded = jsonDecode(response.body);
     } catch (_) {
-      throw const SmsReceiptException('The SMS service returned an invalid response.');
+      throw const SmsReceiptException(
+        'The SMS service returned an invalid response.',
+      );
     }
     if (decoded is! Map<String, dynamic> || decoded['accepted'] != true) {
-      throw const SmsReceiptException('The SMS provider did not confirm receipt submission.');
+      throw const SmsReceiptException(
+        'The SMS provider did not confirm receipt submission.',
+      );
     }
     if (database != null) {
       await database.insert('receipt_sends', {
         'id': 'sms-${DateTime.now().microsecondsSinceEpoch}',
         'delivery_id': delivery.id,
+        if (companyIdProvider != null) 'company_id': companyIdProvider!(),
         'phone': phone,
         'channel': 'sms',
         'status': 'sent',
@@ -77,12 +122,24 @@ class SmsReceiptService {
     }
   }
 
-  static String _message(Delivery delivery) {
-    final weights = delivery.bagWeights.asMap().entries.map((entry) => '${entry.key + 1}. ${entry.value.toStringAsFixed(1)} kg').join('\n');
-    return 'AL-BNC Ventures\n\nReceipt\nCustomer: ${delivery.supplier.name}\nDate: ${_date(delivery.recordedAt)}\nReference: ${delivery.id}\n\nWeights:\n$weights\n\nTotal Weight: ${delivery.totalWeight.toStringAsFixed(1)} kg\nThank you for doing business with us.';
+  static String _message(
+    Delivery delivery,
+    String companyName,
+    Map<String, String> recorderNames,
+  ) {
+    final weights = delivery.bagWeights
+        .asMap()
+        .entries
+        .map(
+          (entry) =>
+              '${entry.key + 1}. ${entry.value.toStringAsFixed(1)} kg — ${recorderDisplayName(delivery.recorderForBag(entry.key), recorderNames)}',
+        )
+        .join('\n');
+    return '$companyName\n\nReceipt\nCustomer: ${delivery.supplier.name}\nDate: ${_date(delivery.recordedAt)}\nReference: ${delivery.id}\nRecorded by: ${recorderDisplayName(delivery.recordedByUserId, recorderNames)}\n\nWeights:\n$weights\n\nTotal Weight: ${delivery.totalWeight.toStringAsFixed(1)} kg\nThank you for doing business with us.';
   }
 
-  static String _date(DateTime date) => '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  static String _date(DateTime date) =>
+      '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
 }
 
 abstract final class GhanaPhoneNumber {
@@ -97,7 +154,8 @@ abstract final class GhanaPhoneNumber {
     } else {
       return null;
     }
-    if (digits.length != 9 || !digits.startsWith(RegExp(r'[2357]'))) return null;
+    if (digits.length != 9 || !digits.startsWith(RegExp(r'[2357]')))
+      return null;
     return '233$digits';
   }
 }

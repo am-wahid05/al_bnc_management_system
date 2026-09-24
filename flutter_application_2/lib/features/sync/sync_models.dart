@@ -29,3 +29,8 @@ class SyncSummary {
 abstract interface class RemoteDeliveryStore {
   Future<void> upsert(Delivery delivery);
 }
+
+abstract interface class CompanyCatalogStore implements RemoteDeliveryStore {
+  Future<void> synchronizeCatalog();
+  Future<void> downloadCompany();
+}
